@@ -63,6 +63,7 @@
   - type: Healing
     damageContainers:
       - Biological
+      - Shadowkin
     damage:
       types:
         Slash: -0.5
