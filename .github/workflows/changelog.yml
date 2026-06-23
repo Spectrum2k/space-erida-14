@@ -5,7 +5,7 @@ on:
     types: [closed]
 
 env:
-  GITHUB_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CHANGELOG_DIR: Resources/Changelog/Erida.yml
   PR_NUMBER: ${{ github.event.number }}
 
@@ -17,10 +17,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout Master
-        # Erida edit: v6 actions avoid the Node 20 deprecation path on GitHub runners.
-        uses: actions/checkout@v6
+        # Erida edit: v5 is Node 24, while v6 includeIf credentials broke auth here.
+        uses: actions/checkout@v5
         with:
-          token: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: master
 
       - name: Setup Git
