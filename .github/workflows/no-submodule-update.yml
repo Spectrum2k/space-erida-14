@@ -2,13 +2,14 @@ name: No submodule update checker
 
 on:
   pull_request:
+    types: [ opened, reopened, synchronize, ready_for_review ]
     paths:
       - 'RobustToolbox'
 
 jobs:
   this_aint_right:
     name: Submodule update in pr found
-    if: ${{ !startsWith(github.head_ref, 'upstream/') }}
+    if: ${{ github.actor != 'Erida-change-bot' && github.event.pull_request.draft == false && !startsWith(github.head_ref, 'upstream/') }}
     runs-on: ubuntu-latest
     steps:
       - name: Fail

@@ -6,22 +6,24 @@ Sends updates to a Discord webhook for new changelog entries since the last GitH
 Automatically figures out the last run and changelog contents with the GitHub API.
 """
 
-import itertools
 import os
+import time
 from pathlib import Path
 from typing import Any, Iterable
 
 import requests
 import yaml
-import time
 
 DEBUG = False
 DEBUG_CHANGELOG_FILE_OLD = Path("Resources/Changelog/Old.yml")
 GITHUB_API_URL = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 
 # https://discord.com/developers/docs/resources/webhook
-DISCORD_SPLIT_LIMIT = 2000
-DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+DISCORD_EMBEDS_PER_MESSAGE_LIMIT = 10
+DISCORD_EMBEDS_TOTAL_TEXT_LIMIT = 5900
+DISCORD_EMBED_DESCRIPTION_LIMIT = 3900
+MAX_CHANGE_MESSAGE_LENGTH = 1000
+ERIDA_EMBED_COLOR = 0xA06DA8
 
 CHANGELOG_FILE = "Resources/Changelog/Erida.yml" # Erida edit
 
@@ -34,8 +36,7 @@ def main():
     webhook_erida = os.environ.get("DISCORD_WEBHOOK_URL_ERIDA")
 
     if not webhook_erida:
-        print("No discord webhook URL found, skipping discord send")
-        return
+        raise RuntimeError("DISCORD_WEBHOOK_URL_ERIDA is not set")
 
     if DEBUG:
         # to debug this script locally, you can use
@@ -50,11 +51,14 @@ def main():
     with open(CHANGELOG_FILE, "r") as f:
         cur_changelog = yaml.safe_load(f)
 
-    diff = diff_changelog(last_changelog, cur_changelog)
+    diff = list(diff_changelog(last_changelog, cur_changelog))
 
-    for entry in diff:
-        embed = entry_to_embed(entry)
-        send_embed(embed)
+    if not diff:
+        print("No new changelog entries since the last successful publish")
+        return
+
+    print(f"Sending {len(diff)} changelog entries since the last successful publish")
+    send_embeds(changelog_entries_to_embeds(diff))
 
 
 def get_most_recent_workflow(
@@ -68,6 +72,8 @@ def get_most_recent_workflow(
             continue
 
         return run
+
+    raise RuntimeError("No previous successful publish workflow run found")
 
 
 def get_current_run(
@@ -97,11 +103,11 @@ def get_last_changelog() -> str:
 
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {github_token}"
-    session.headers["Accept"] = "Accept: application/vnd.github+json"
+    session.headers["Accept"] = "application/vnd.github+json"
     session.headers["X-GitHub-Api-Version"] = "2022-11-28"
 
     most_recent = get_most_recent_workflow(session, github_repository, github_run)
-    last_sha = most_recent["head_commit"]["id"]
+    last_sha = most_recent["head_sha"]
     print(f"Last successful publish job was {most_recent['id']}: {last_sha}")
     last_changelog_stream = get_last_changelog_by_sha(
         session, last_sha, github_repository
@@ -136,20 +142,19 @@ def diff_changelog(
     """
     Find all new entries not present in the previous publish.
     """
-    old_entry_ids = {e["id"] for e in old["Entries"]}
-    return (e for e in cur["Entries"] if e["id"] not in old_entry_ids)
+    old_entry_ids = {e["id"] for e in old.get("Entries", [])}
+    return (e for e in cur.get("Entries", []) if e["id"] not in old_entry_ids)
 
 
-def get_discord_body(content: str):
+def get_discord_body(embeds: list[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "content": content,
-        # Do not allow any mentions.
-        # "allowed_mentions": {"parse": []},
-        # SUPPRESS_EMBEDS
+        "embeds": embeds,
+        "allowed_mentions": {"parse": []},
         "flags": 0,
     }
 
-def send_with_retry(webhook_url: str, body: dict, name: str):
+
+def send_with_retry(webhook_url: str, body: dict[str, Any], name: str) -> None:
     retry_attempt = 0
     MAX_RETRIES = 20
 
@@ -159,8 +164,7 @@ def send_with_retry(webhook_url: str, body: dict, name: str):
             if response.status_code == 429:
                 retry_attempt += 1
                 if retry_attempt > MAX_RETRIES:
-                    print(f"[{name}] Too many retries, giving up")
-                    return
+                    raise RuntimeError(f"[{name}] Too many retries, giving up")
                 retry_after = response.json().get("retry_after", 5)
                 print(f"[{name}] Rate limited, retrying after {retry_after} seconds")
                 time.sleep(retry_after)
@@ -170,120 +174,99 @@ def send_with_retry(webhook_url: str, body: dict, name: str):
             print(f"Sent to {name} webhook")
             break
         except requests.exceptions.RequestException as e:
-            print(f"[{name}] Failed to send message: {e}")
-            break
+            raise RuntimeError(f"[{name}] Failed to send message") from e
 
-def send_discord_webhook(lines: list[str]):
-    content = "".join(lines)
-    body = get_discord_body(content)
 
+def send_discord_webhook(embeds: list[dict[str, Any]]) -> None:
     webhook_url_erida = os.environ.get("DISCORD_WEBHOOK_URL_ERIDA")
 
     if webhook_url_erida:
-        send_with_retry(webhook_url_erida, body, "Erida")
+        send_with_retry(webhook_url_erida, get_discord_body(embeds), "Erida")
 
     if not webhook_url_erida:
-        print("No Discord webhooks configured!")
+        raise RuntimeError("No Discord webhooks configured!")
 
 
-def changelog_entries_to_message_lines(entries: Iterable[ChangelogEntry]) -> list[str]:
-    """Process structured changelog entries into a list of lines making up a formatted message."""
-    message_lines = []
+def changelog_entries_to_embeds(entries: Iterable[ChangelogEntry]) -> list[dict[str, Any]]:
+    """Process structured changelog entries into Discord embeds."""
+    return [entry_to_embed(entry) for entry in entries]
 
-    for contributor_name, group in itertools.groupby(entries, lambda x: x["author"]):
-        message_lines.append("\n")
-        message_lines.append(f"**{contributor_name}** updated:\n")
 
-        for entry in group:
-            url = entry.get("url")
-            if url and not url.strip():
-                url = None
-
-            for change in entry["changes"]:
-                emoji = TYPES_TO_EMOJI.get(change["type"], "❓")
-                message = change["message"]
-
-                # if a single line is longer than the limit, it needs to be truncated
-                if len(message) > DISCORD_SPLIT_LIMIT:
-                    message = message[: DISCORD_SPLIT_LIMIT - 100].rstrip() + " [...]"
-
-                if url is not None:
-                    pr_number = url.split("/")[-1]
-                    line = f"{emoji} - {message} ([#{pr_number}]({url}))\n"
-                else:
-                    line = f"{emoji} - {message}\n"
-
-                message_lines.append(line)
-
-    return message_lines
-
-def entry_to_embed(entry: ChangelogEntry) -> dict:
+def entry_to_embed(entry: ChangelogEntry) -> dict[str, Any]:
     lines = []
 
     for change in entry["changes"]:
         emoji = TYPES_TO_EMOJI.get(change["type"], "❓")
-        message = change["message"]
-
-        if len(message) > 4000:
-            message = message[:3900].rstrip() + "..."
-
+        message = truncate(str(change["message"]), MAX_CHANGE_MESSAGE_LENGTH)
         lines.append(f"{emoji} - {message}")
 
-    description = "\n".join(lines)
+    description = truncate("\n".join(lines), DISCORD_EMBED_DESCRIPTION_LIMIT)
+    title = truncate(str(entry.get("title") or "Changelog update"), 256)
 
-    embed = {
-        "title": entry["title"],
+    embed: dict[str, Any] = {
+        "title": title,
         "description": description,
-        "color": 0xa06da8,
-        "fields": [],
+        "color": ERIDA_EMBED_COLOR,
         "footer": {
-            "text": entry.get("author"),
-            "icon_url": entry.get("avatar_url"),
+            "text": truncate(str(entry.get("author") or "Unknown"), 256),
         },
-        "url": entry.get("url"),
-        "timestamp": entry["time"],
     }
+
+    url = entry.get("url")
+    if url and str(url).strip():
+        embed["url"] = str(url)
+
+    avatar_url = entry.get("avatar_url")
+    if avatar_url and str(avatar_url).strip():
+        embed["footer"]["icon_url"] = str(avatar_url)
+
+    timestamp = entry.get("time")
+    if timestamp:
+        embed["timestamp"] = str(timestamp)
 
     return embed
 
-def send_embed(embed: dict):
-    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL_ERIDA")
 
-    if not webhook_url:
-        print("No Discord webhook configured!")
-        return
+def truncate(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
 
-    body = {
-        "content": "",
-        "embeds": [embed],
-        # "allowed_mentions": {"parse": []},
-        # "flags": 1 << 2,
-    }
+    return value[: limit - 6].rstrip() + " [...]"
 
-    send_with_retry(webhook_url, body, "Erida")
 
-def send_message_lines(message_lines: list[str]):
-    """Join a list of message lines into chunks that are each below Discord's message length limit, and send them."""
-    chunk_lines = []
-    chunk_length = 0
+def embed_text_length(embed: dict[str, Any]) -> int:
+    footer = embed.get("footer") or {}
+    return (
+        len(str(embed.get("title") or ""))
+        + len(str(embed.get("description") or ""))
+        + len(str(footer.get("text") or ""))
+    )
 
-    for line in message_lines:
-        line_length = len(line)
-        new_chunk_length = chunk_length + line_length
 
-        if new_chunk_length > DISCORD_SPLIT_LIMIT:
-            print("Split changelog and sending to discord")
-            send_discord_webhook(chunk_lines)
+def iter_embed_batches(embeds: list[dict[str, Any]]) -> Iterable[list[dict[str, Any]]]:
+    batch: list[dict[str, Any]] = []
+    batch_length = 0
 
-            new_chunk_length = line_length
-            chunk_lines.clear()
+    for embed in embeds:
+        embed_length = embed_text_length(embed)
+        batch_full = len(batch) >= DISCORD_EMBEDS_PER_MESSAGE_LIMIT
+        batch_too_long = batch_length + embed_length > DISCORD_EMBEDS_TOTAL_TEXT_LIMIT
 
-        chunk_lines.append(line)
-        chunk_length = new_chunk_length
+        if batch and (batch_full or batch_too_long):
+            yield batch
+            batch = []
+            batch_length = 0
 
-    if chunk_lines:
-        print("Sending final changelog to discord")
-        send_discord_webhook(chunk_lines)
+        batch.append(embed)
+        batch_length += embed_length
+
+    if batch:
+        yield batch
+
+
+def send_embeds(embeds: list[dict[str, Any]]) -> None:
+    for batch in iter_embed_batches(embeds):
+        send_discord_webhook(batch)
 
 
 if __name__ == "__main__":

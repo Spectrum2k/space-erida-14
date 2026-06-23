@@ -1,16 +1,21 @@
-﻿name: "Labels: Review"
+name: "Labels: Needs Review"
 
 on:
   pull_request_target:
-    types: [review_requested, opened]
+    types: [opened, reopened, ready_for_review, review_requested, synchronize]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
-  add_label:
+  needs_review:
+    if: github.actor != 'Erida-change-bot' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-    - uses: actions-ecosystem/action-add-labels@v1
-      with:
-        labels: "S: Needs Review"
-    - uses: actions-ecosystem/action-remove-labels@v1
-      with:
-        labels: "S: Awaiting Changes"
+      - name: Mark PR as needing review
+        uses: actions/labeler@v6.1.0
+        with:
+          configuration-path: .github/labeler-review-state.yml
+          sync-labels: true

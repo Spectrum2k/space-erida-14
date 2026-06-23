@@ -2,40 +2,46 @@ name: Diff RSIs
 
 on:
   pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - '**.rsi/**.png'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
 
 jobs:
   diff:
     name: Diff
+    if: github.actor != 'Erida-change-bot' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4.2.2
-
-      - name: Get changed files
+      - name: Get changed RSI files
         id: files
-        uses: Ana06/get-changed-files@v2.3.0
+        uses: tj-actions/changed-files@v47.0.6
         with:
-          format: 'space-delimited'
-          filter: |
-            **.rsi
-            **.png
+          files: '**.rsi/**.png'
+          use_rest_api: true
+          output_renamed_files_as_deleted_and_added: true
+          separator: ' '
+          quotepath: false
+          safe_output: false
 
       - name: Diff changed RSIs
         id: diff
         uses: space-wizards/RSIDiffBot@v1.1
         with:
-          modified: ${{ steps.files.outputs.modified }}
-          removed: ${{ steps.files.outputs.removed }}
-          added: ${{ steps.files.outputs.added }}
+          modified: ${{ steps.files.outputs.modified_files }}
+          removed: ${{ steps.files.outputs.deleted_files }}
+          added: ${{ steps.files.outputs.added_files }}
           basename: ${{ github.event.pull_request.base.repo.full_name }}
           basesha: ${{ github.event.pull_request.base.sha }}
           headname: ${{ github.event.pull_request.head.repo.full_name }}
           headsha: ${{ github.event.pull_request.head.sha }}
 
       - name: Potentially find comment
-        uses: peter-evans/find-comment@v1
+        uses: peter-evans/find-comment@v4.0.0
         id: fc
         with:
           issue-number: ${{ github.event.number }}
@@ -44,7 +50,7 @@ jobs:
 
       - name: Create comment if it doesn't exist
         if: steps.fc.outputs.comment-id == ''
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.number }}
           body: |
@@ -52,7 +58,7 @@ jobs:
 
       - name: Update comment if it exists
         if: steps.fc.outputs.comment-id != ''
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           edit-mode: replace
@@ -61,7 +67,7 @@ jobs:
 
       - name: Update comment to read that it has been edited
         if: steps.fc.outputs.comment-id != ''
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           edit-mode: append

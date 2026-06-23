@@ -8,13 +8,18 @@ on:
       - reopened
       - ready_for_review
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
 jobs:
   Label:
     if: ( github.event.pull_request.draft == false ) && ( github.actor != 'Erida-change-bot' )
     runs-on: ubuntu-latest
     steps:
       - name: Check for Merge Conflicts
-        uses: eps1lon/actions-label-merge-conflict@v3.0.0
+        uses: eps1lon/actions-label-merge-conflict@v3.1.0
         with:
           dirtyLabel: "S: Merge Conflict"
           repoToken: "${{ secrets.GITHUB_TOKEN }}"

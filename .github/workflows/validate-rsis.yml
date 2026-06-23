@@ -5,16 +5,17 @@ on:
     branches: [ master, staging, stable ]
   merge_group:
   pull_request:
+    types: [ opened, reopened, synchronize, ready_for_review ]
     paths:
       - '**.rsi/**'
 
 jobs:
   validate_rsis:
     name: Validate RSIs
-    if: github.actor != 'Erida-change-bot'
+    if: github.actor != 'Erida-change-bot' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.0
       - name: Setup Submodule
         run: git submodule update --init
       - name: Pull engine updates

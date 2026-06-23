@@ -1,9 +1,14 @@
 name: "Labels: Size"
-on: pull_request_target
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+
 jobs:
   size-label:
+    if: github.actor != 'Erida-change-bot' && github.event.pull_request.draft == false
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     runs-on: ubuntu-latest
     steps:

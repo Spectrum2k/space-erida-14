@@ -93,10 +93,30 @@
 <summary>License</summary>
 
 ### Code
-This project is licensed under **AGPL-3.0-or-later**.
+This project as a whole is distributed under **AGPL-3.0-or-later**.
 
-Each file contains REUSE-compatible headers or `.license` files that may specify **dual licensing** options.
-This allows parts of the codebase to be reused under alternative licenses where applicable.
+Some individual files may be available under more permissive or **dual licensing** options through
+REUSE-compatible SPDX headers or adjacent `.license` files. The nearest file-level license notice is
+the source of truth for that file; keep existing license, copyright, and provenance notices intact.
+
+New original Erida files should be licensed under **MIT** and should carry REUSE/SPDX metadata near
+the top of the file:
+
+```text
+SPDX-FileCopyrightText: 2026 <copyright holder>
+SPDX-License-Identifier: MIT
+```
+
+`MIT OR AGPL-3.0-or-later` is also acceptable when an explicit dual-license is useful. Use MIT or
+dual MIT/AGPL licensing only for code that is original to Erida or based on sources that permit this.
+Do not mark copied or adapted AGPL/GPL/fork code as MIT-only; preserve the original license and
+attribution. Existing AGPL files and files ported from AGPL projects are expected to remain AGPL.
+When MIT or dual-licensed files are built into Erida, the combined project distribution still follows
+**AGPL-3.0-or-later**.
+
+Pull requests are checked for this metadata on new text files. Existing files without SPDX metadata
+are left alone. Existing files that already contain SPDX metadata may produce non-blocking review
+warnings if copyright metadata looks incomplete.
 
 Full license texts can be found in `LICENSE-AGPLv3.TXT`, `LICENSE-GPLv3.TXT`, and `LICENSE-MIT.TXT`.
 

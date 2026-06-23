@@ -1,20 +1,30 @@
-name: "Labels: Approved"
+name: "Labels: Review State"
 
 on:
   pull_request_review:
-    types: [submitted]
+    types: [submitted, dismissed]
 
 permissions:
   contents: read
 
 jobs:
-  approved_review:
-    # Change the repository name after you've made sure the team name is correct for your fork!
-    if: ${{ (github.repository == 'dead-space-server/space-erida-14') && (github.event.review.state == 'approved') }}
+  record_review:
+    if: >-
+      ${{
+        github.repository == 'dead-space-server/space-erida-14' &&
+        (
+          github.event.review.state == 'approved' ||
+          github.event.review.state == 'changes_requested' ||
+          github.event.review.state == 'dismissed'
+        )
+      }}
     runs-on: ubuntu-latest
     steps:
-    - name: Record approved review
-      # Erida edit: fork PR review events have a read-only token; a workflow_run follow-up applies the label.
-      run: |
-        echo "Approved review for PR #${{ github.event.pull_request.number }}"
-        echo "Reviewed commit: ${{ github.event.review.commit_id }}"
+      - name: Upload review event
+        # Erida edit: fork PR review events have a read-only token; a workflow_run follow-up applies labels.
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: review-event
+          path: ${{ github.event_path }}
+          if-no-files-found: error
+          retention-days: 1

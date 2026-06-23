@@ -1,0 +1,107 @@
+# SPDX-FileCopyrightText: 2026 Yaroslav Yudaev <ydaevy10@gmail.com>
+# SPDX-License-Identifier: MIT
+
+name: "Reusable: Apply Review State Label"
+
+on:
+  workflow_call:
+    inputs:
+      workflow-run-id:
+        required: true
+        type: string
+
+jobs:
+  apply_review_state:
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: write
+      statuses: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download review event
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: review-event
+          path: review-event
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.workflow-run-id }}
+
+      - name: Read pull request number
+        id: review_event_pr
+        uses: cloudposse/github-action-jq@v0.4.1
+        with:
+          input: review-event/event.json
+          script: .pull_request.number
+          raw-output: true
+
+      - name: Read reviewed head SHA
+        id: review_event_head
+        uses: cloudposse/github-action-jq@v0.4.1
+        with:
+          input: review-event/event.json
+          script: .pull_request.head.sha
+          raw-output: true
+
+      - name: Read current pull request
+        id: current_pr
+        if: steps.review_event_pr.outputs.output != ''
+        uses: octokit/request-action@v3.0.0
+        with:
+          route: GET /repos/${{ github.repository }}/pulls/${{ steps.review_event_pr.outputs.output }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Apply approved review label
+        id: pr-status
+        if: >-
+          steps.current_pr.outcome == 'success' &&
+          fromJson(steps.current_pr.outputs.data).head.sha == steps.review_event_head.outputs.output
+        uses: GrantBirki/pr-status@v3.0.0
+        with:
+          pr_number: ${{ steps.review_event_pr.outputs.output }}
+          evaluations: approved
+          pass_labels: "S: Approved"
+          pass_labels_cleanup: "S: Needs Review,S: Awaiting Changes"
+
+      - name: Add awaiting changes label
+        if: >-
+          steps.pr-status.outcome == 'success' &&
+          steps.pr-status.outputs.review_decision == 'CHANGES_REQUESTED'
+        uses: step-security/action-add-labels@v1.1.1
+        with:
+          number: ${{ steps.review_event_pr.outputs.output }}
+          labels: "S: Awaiting Changes"
+
+      - name: Add needs review label
+        if: >-
+          steps.pr-status.outcome == 'success' &&
+          steps.pr-status.outputs.review_decision == 'REVIEW_REQUIRED'
+        uses: step-security/action-add-labels@v1.1.1
+        with:
+          number: ${{ steps.review_event_pr.outputs.output }}
+          labels: "S: Needs Review"
+
+      - name: Remove stale review labels after requested changes
+        if: >-
+          steps.pr-status.outcome == 'success' &&
+          steps.pr-status.outputs.review_decision == 'CHANGES_REQUESTED'
+        uses: step-security/action-remove-labels@v1.3.1
+        with:
+          number: ${{ steps.review_event_pr.outputs.output }}
+          labels: |
+            S: Needs Review
+            S: Approved
+
+      - name: Remove stale review labels while review is required
+        if: >-
+          steps.pr-status.outcome == 'success' &&
+          steps.pr-status.outputs.review_decision == 'REVIEW_REQUIRED'
+        uses: step-security/action-remove-labels@v1.3.1
+        with:
+          number: ${{ steps.review_event_pr.outputs.output }}
+          labels: |
+            S: Awaiting Changes
+            S: Approved

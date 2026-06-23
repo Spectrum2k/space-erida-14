@@ -59,6 +59,9 @@ def main():
     if not resp.ok:
         print(f"Publish start FAILED: {resp.status_code} {resp.reason}")
         print(f"Response: {resp.text}")
+        if resp.status_code == 409 and "Version already exists" in resp.text:
+            print("Version already exists; treating rerun as successful.")
+            return
         resp.raise_for_status()
     publish_id = resp.headers.get("Robust-Cdn-Publish-Id")
     if not publish_id:
