@@ -4,6 +4,7 @@
 
 import argparse
 from dataclasses import dataclass
+import json
 import os
 import re
 import subprocess
@@ -123,6 +124,14 @@ def is_license_text(relative_path: str) -> bool:
     return name.startswith("LICENSE") or name.startswith("COPYING")
 
 
+def is_fluent_locale(relative_path: str) -> bool:
+    return relative_path.endswith(".ftl")
+
+
+def is_rsi_metadata(relative_path: str) -> bool:
+    return relative_path.endswith(".rsi/meta.json")
+
+
 def read_text_prefix(path: Path) -> tuple[bool, str]:
     data = path.read_bytes()
     if b"\0" in data:
@@ -187,7 +196,11 @@ def author_matches_copyright(author: Author, copyrights: list[str]) -> bool:
 
 
 def check_added_file(repo: Path, relative_path: str, result: CheckResult):
-    if is_license_sidecar(relative_path) or is_license_text(relative_path):
+    if is_rsi_metadata(relative_path):
+        check_added_rsi_metadata(repo / relative_path, relative_path, result)
+        return
+
+    if is_license_sidecar(relative_path) or is_license_text(relative_path) or is_fluent_locale(relative_path):
         return
 
     path = repo / relative_path
@@ -209,6 +222,25 @@ def check_added_file(repo: Path, relative_path: str, result: CheckResult):
         result.checked.append(relative_path)
     else:
         result.errors.append(Issue(relative_path, missing_metadata_message(metadata)))
+
+
+def check_added_rsi_metadata(path: Path, relative_path: str, result: CheckResult):
+    try:
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        result.errors.append(Issue(relative_path, "invalid RSI meta.json"))
+        return
+
+    missing = []
+    if not str(metadata.get("copyright", "")).strip():
+        missing.append("copyright")
+    if not str(metadata.get("license", "")).strip():
+        missing.append("license")
+
+    if missing:
+        result.errors.append(Issue(relative_path, "missing RSI " + " and ".join(missing)))
+    else:
+        result.checked.append(relative_path)
 
 
 def check_modified_file(repo: Path, base_ref: str, head_ref: str, relative_path: str, result: CheckResult):
