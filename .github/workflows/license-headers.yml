@@ -25,13 +25,15 @@ jobs:
           path: checker
           persist-credentials: false
 
-      - name: Checkout pull request
-        uses: actions/checkout@v7.0.0
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
-          path: pull-request
-          fetch-depth: 0
-          persist-credentials: false
+      - name: Fetch pull request merge commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init pull-request
+          git -C pull-request remote add origin "https://github.com/${{ github.repository }}.git"
+          git -C pull-request fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          git -C pull-request fetch --no-tags --depth=1 origin "refs/pull/${{ github.event.pull_request.number }}/merge"
+          git -C pull-request checkout --detach FETCH_HEAD
 
       - name: Check new file license headers
         id: license-check

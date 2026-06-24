@@ -17,6 +17,15 @@ jobs:
     if: github.actor != 'Erida-change-bot' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout workflow tools
+        uses: actions/checkout@v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: |
+            Tools/Erida/prepare_rsi_diff_comment.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - name: Get changed RSI files
         id: files
         uses: tj-actions/changed-files@v47.0.6
@@ -40,15 +49,32 @@ jobs:
           headname: ${{ github.event.pull_request.head.repo.full_name }}
           headsha: ${{ github.event.pull_request.head.sha }}
 
-      - name: Write RSI diff comment body
+      - name: Write full RSI diff body
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
           body = ${{ toJSON(steps.diff.outputs['summary-details']) }}
-          Path("rsi-diff-comment.md").write_text(body, encoding="utf-8")
+          Path("rsi-diff-full.md").write_text(body, encoding="utf-8")
           PY
+
+      - name: Prepare RSI diff comment
+        id: rsi-comment
+        run: >
+          python Tools/Erida/prepare_rsi_diff_comment.py
+          --input rsi-diff-full.md
+          --output rsi-diff-comment.md
+          --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Upload full RSI diff
+        if: steps.rsi-comment.outputs.oversized == 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: rsi-diff-full
+          path: rsi-diff-full.md
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Create or update RSI diff comment
         uses: marocchino/sticky-pull-request-comment@v3.0.4
