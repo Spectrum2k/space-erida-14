@@ -871,3 +871,87 @@ Entries:
   url: https://github.com/dead-space-server/space-erida-14/pull/374
   avatar_url: https://avatars.githubusercontent.com/u/250869396?v=4
   title: f
+- author: Spectrum2k
+  changes:
+    - type: Add
+      message: В аплинк добавлены плазменный меч и коса.
+    - type: Add
+      message: РСУ теперь может создавать камеры.
+    - type: Add
+      message: Из манифеста теперь можно быстро копировать записи.
+    - type: Fix
+      message: Исправлен метаболизм плафеимов.
+    - type: Fix
+      message: Слаймолюды снова могут менять цвет своих глаз.
+    - type: Fix
+      message: Анимации шлюзов снова адекватные (надеюсь).
+    - type: Fix
+      message: Станционный ИИ снова может управлять боргами (наверное?).
+    - type: Fix
+      message: Исправлено немного внутренних багов.
+  id: 74
+  time: '2026-06-23T22:45:43.0000000+00:00'
+  url: https://github.com/dead-space-server/space-erida-14/pull/394
+  avatar_url: https://avatars.githubusercontent.com/u/49170788?v=4
+  title: И снова мы тут
+- author: vanomorodellefake
+  changes:
+    - type: Tweak
+      message: Изолированные перчатки не позволяют стрелять
+    - type: Tweak
+      message: Боевые перчатки стали более распространёнными
+    - type: Tweak
+      message: Кошмар больше не умеет стрелять
+  id: 75
+  time: '2026-06-23T22:54:31.0000000+00:00'
+  url: https://github.com/dead-space-server/space-erida-14/pull/381
+  avatar_url: https://avatars.githubusercontent.com/u/53963119?v=4
+  title: BigFingers
+- author: vanomorodellefake
+  changes:
+    - type: Tweak
+      message: Эсворд теперь имеет шанс 75% отражения только энергетический зарядов
+    - type: Tweak
+      message: >-
+        Двойной эсворд теперь имеет шанс 100% отразить энергетический заряд и
+        50% кинетический
+  id: 76
+  time: '2026-06-23T22:56:33.0000000+00:00'
+  url: https://github.com/dead-space-server/space-erida-14/pull/384
+  avatar_url: https://avatars.githubusercontent.com/u/53963119?v=4
+  title: Reflect System Changes
+- author: Tiwulovoe
+  changes:
+    - type: Tweak
+      message: Скафандр БЩ получил взрывозащиту 30% и терморезист 30 -> 35
+    - type: Tweak
+      message: Некрозол теперь выводит 2 радиационного урона
+    - type: Fix
+      message: Пожарный топор вновь снимает покрытие
+    - type: Fix
+      message: Дионы снова обладают тау-цети и языком корней
+    - type: Fix
+      message: 'Резисты жилета синего щита приравнены к шинели '
+  id: 77
+  time: '2026-06-23T23:02:13.0000000+00:00'
+  url: https://github.com/dead-space-server/space-erida-14/pull/392
+  avatar_url: https://avatars.githubusercontent.com/u/250869396?v=4
+  title: Багфикс и Блющилд
+- author: Tiwulovoe
+  changes:
+    - type: Add
+      message: Портирован свадебный контент с ADT
+  id: 78
+  time: '2026-06-23T23:14:57.0000000+00:00'
+  url: https://github.com/dead-space-server/space-erida-14/pull/391
+  avatar_url: https://avatars.githubusercontent.com/u/250869396?v=4
+  title: What is love?
+- author: vanomorodellefake
+  changes:
+    - type: Add
+      message: Крафт двойного эсворда из двух одноручных
+  id: 79
+  time: '2026-06-24T07:55:06.0000000+00:00'
+  url: https://github.com/dead-space-server/space-erida-14/pull/385
+  avatar_url: https://avatars.githubusercontent.com/u/53963119?v=4
+  title: Double Energy Sword Craft
